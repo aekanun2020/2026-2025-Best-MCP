@@ -48,47 +48,143 @@ async def get_schema(table_name: str) -> str:
 # MCP Tools
 @mcp_server.tool()
 async def execute_query_tool(query: str) -> str:
-    """Execute a read-only SQL query and return the results
-    
-    Args:
-        query: SQL query to execute (must be SELECT only)
+    """Run an arbitrary T-SQL query and return the result rows as text.
+
+    WHEN TO USE:
+        - Any question that needs filtering, aggregation, sorting, joins, or
+          exact answers: COUNT / SUM / AVG / WHERE / GROUP BY / ORDER BY / JOIN.
+        - "How many...", "total...", "top N by...", "for year 2025 only...".
+        - Call get_database_context() FIRST so you know table/column names and
+          relationships, then write a correct query here.
+
+    WHEN NOT TO USE:
+        - Just to eyeball what a table looks like -> use preview_table instead.
+        - To discover schema/relationships -> use get_database_context instead.
+        - Do NOT answer counting/total/ranking questions from preview_table rows;
+          always compute them with a real query here.
+
+    ARGS:
+        query (str): A single T-SQL statement. Must be non-empty.
+            Use T-SQL syntax: SELECT TOP n (not LIMIT), GETDATE() (not NOW()).
+            This server runs against Microsoft SQL Server.
+
+    SECURITY:
+        The read-only (SELECT-only) guard is currently disabled, so this tool
+        CAN run INSERT/UPDATE/DELETE/DROP. For a read-only deployment, enable the
+        guard below. A non-SELECT statement raises ValueError when the guard is on.
+
+    RETURNS (JSON string):
+        Success: {"result": "<rows as text>"}. Results larger than 10,000 chars
+            are truncated to the first 100 rows with a note.
+        Empty:   {"result": "Query executed successfully but returned no results."}
+        DB error / bad SQL / no connection: {"error": "<message>"} (does NOT raise;
+            inspect the 'error' field before using the output).
+
+    RAISES:
+        ValueError: if query is empty/whitespace (or non-SELECT when the guard is enabled).
     """
-    # Safety check for read-only queries
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("`query` must be a non-empty SQL string.")
     query = query.strip()
-    # Commented out for flexibility, but can be enabled for production
+
+    # Read-only guard. Enable for production to reject write statements.
     # if not query.lower().startswith('select'):
-    #     return json.dumps({"error": "Only SELECT queries are allowed for security reasons."})
-    
+    #     raise ValueError("Only SELECT queries are allowed (read-only mode).")
+
     result = execute_query(query)
     return json.dumps(result)
 
 @mcp_server.tool()
 async def preview_table(table_name: str, limit: int = 10) -> str:
-    """Get a preview of the data in a table
-    
-    Args:
-        table_name: Name of the table to preview
-        limit: Maximum number of rows to return (default: 10)
+    """Peek at a few sample rows from a table (SELECT TOP n * FROM table).
+
+    WHEN TO USE:
+        - To see what a table's data looks like before writing a real query.
+        - To inspect column values, formats, and example content.
+
+    WHEN NOT TO USE (IMPORTANT):
+        - Do NOT use the returned rows to answer counting, total, average, max/min,
+          filtered, or ranking questions. There is NO WHERE and NO ORDER BY, so the
+          rows are an arbitrary slice, NOT the "first N" or "top N" in any logical
+          sense and the order is not guaranteed. For those questions use
+          execute_query_tool with proper WHERE / ORDER BY / aggregate functions.
+        - Do NOT summarize a large table from this small sample.
+
+    ARGS:
+        table_name (str): Exact table name as returned by get_database_context /
+            list_tables. Must be non-empty. Wrapped in [brackets] automatically.
+        limit (int): Number of sample rows. Accepted range 1-1000.
+            Default 10. Values > 1000 are capped to 1000; values < 1 raise ValueError.
+
+    RETURNS (JSON string):
+        Success: {"result": "<sample rows as text>"}
+        Empty table: {"result": "Query executed successfully but returned no results."}
+        Unknown table / DB error: {"error": "<message>"} (does NOT raise;
+            check the 'error' field, e.g. an invalid table name surfaces here).
+
+    RAISES:
+        ValueError: if table_name is empty, or limit is not a positive integer.
     """
-    # Ensure limit is integer
-    limit = int(limit)
-    
+    if not isinstance(table_name, str) or not table_name.strip():
+        raise ValueError("`table_name` must be a non-empty string.")
+    table_name = table_name.strip()
+
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        raise ValueError("`limit` must be an integer between 1 and 1000.")
+    if limit < 1:
+        raise ValueError("`limit` must be >= 1.")
     if limit > 1000:
         limit = 1000  # Cap the maximum for safety
-    
+
     query = f"SELECT TOP {limit} * FROM [{table_name}]"
     result = execute_query(query)
     return json.dumps(result)
 
 @mcp_server.tool()
 async def get_database_info_tool() -> str:
-    """Get general information about the database"""
+    """Get high-level metadata about the database (not the data itself).
+
+    WHEN TO USE:
+        - When you need the database name, server, table count, SQL Server
+          version, or database size in MB.
+
+    WHEN NOT TO USE:
+        - To read table contents -> use preview_table or execute_query_tool.
+        - To get column-level schema / relationships -> use get_database_context.
+
+    ARGS:
+        none.
+
+    RETURNS (JSON string):
+        {"database_name", "server", "table_count", "server_version", "size_mb"}.
+        On failure: {"error": "..."}, or the same object with an extra "error"
+        key if only part of the lookup failed (does NOT raise).
+    """
     info = get_database_info()
     return json.dumps(info, indent=2)
 
 @mcp_server.tool()
 async def refresh_db_cache() -> str:
-    """Refresh the database schema cache"""
+    """Reload the cached table list, schemas, and relationship graph from the DB.
+
+    WHEN TO USE:
+        - After the database structure changes (tables/columns/foreign keys added,
+          dropped, or renamed) so get_database_context returns fresh information.
+
+    WHEN NOT TO USE:
+        - As part of answering normal data questions; the cache is already loaded
+          at startup. Refreshing re-queries metadata for every table and is slower.
+
+    ARGS:
+        none.
+
+    RETURNS (JSON string):
+        {"status": "success", "message": "Cache refreshed. Found N tables."}.
+        If the DB is unreachable the table count is 0 (the underlying calls return
+        empty rather than raising).
+    """
     db_cache.refresh()
     return json.dumps({
         "status": "success",
@@ -98,16 +194,31 @@ async def refresh_db_cache() -> str:
 
 @mcp_server.tool()
 async def get_database_context() -> str:
-    """Get complete database context including schema, relationships, and T-SQL syntax guide.
-    
-    This tool provides comprehensive information about the database structure:
-    - Database metadata (name, table count, size)
-    - All table schemas (columns, types, nullability)
-    - Relationship graph (foreign keys, loner tables)
-    - T-SQL syntax guide
-    - Common query examples
-    
-    Call this tool FIRST before executing queries to understand the database structure.
+    """Get the full database structure: schemas, relationships, and a T-SQL guide.
+
+    WHEN TO USE:
+        - ALWAYS call this FIRST, before writing any query, so you use correct
+          table names, column names, data types, and join paths.
+        - When you need to know which tables relate via foreign keys and which can
+          be queried standalone (loner tables).
+
+    WHEN NOT TO USE:
+        - To read actual row data -> use preview_table or execute_query_tool.
+        - Repeatedly in a loop; the result is cached, but it is large. Call once
+          per session unless the schema changed (then call refresh_db_cache first).
+
+    ARGS:
+        none.
+
+    RETURNS (JSON string), an object with:
+        - database_info: {name, server, table_count, tables[]}
+        - tsql_syntax_guide: T-SQL reminders (TOP not LIMIT, GETDATE not NOW, etc.)
+        - relationships: {has_relationships, relationship_count, foreign_keys[],
+          loner_tables[], query_hints}
+        - table_schemas: per-table column list (name, type, max_length, nullable, default)
+        - common_queries: ready-made INFORMATION_SCHEMA snippets
+        Served from cache (~ms when warm). Does NOT raise; if the DB was unreachable
+        at cache load, lists may be empty.
     """
     
     tables = db_cache.get_tables()
