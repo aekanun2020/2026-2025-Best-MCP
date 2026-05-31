@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Container 1: MCP Server (NEW)
+  mcp-server:
+    build: ./mcp-server
+    container_name: contextual-rag-mcp
+    ports:
+      - "9001:8001"  # External:Internal
+    environment:
+      - OPENSEARCH_HOST=opensearch
+      - OPENSEARCH_PORT=9200
+      - OLLAMA_URL=http://ollama:11434
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8001
+    volumes:
+      - ./AuthenticRAG-Qwen2.5API:/app/rag:ro  # Mount existing code (read-only)
+    depends_on:
+      - opensearch
+      - ollama
+    networks:
+      - contextual-rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Container 2: OpenSearch (KEEP from current)
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: contextual-rag-opensearch
+    ports:
+      - "9201:9200"  # External:Internal - Avoid conflict with stopped opensearch-single-node
+      - "9601:9600"  # Performance analyzer
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - contextual-rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Container 3: Ollama (KEEP from current)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: contextual-rag-ollama
+    ports:
+      - "11435:11434"  # External:Internal - Avoid conflict with existing Ollama
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - contextual-rag-network
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Container 4: Streamlit UI (KEEP from current)
+  streamlit:
+    build: ./AuthenticRAG-Qwen2.5API
+    container_name: contextual-rag-ui
+    ports:
+      - "9501:8501"  # External:Internal
+    environment:
+      - OPENSEARCH_HOST=opensearch
+      - OPENSEARCH_PORT=9200
+      - OLLAMA_URL=http://ollama:11434
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - ./AuthenticRAG-Qwen2.5API:/app
+      - ./AuthenticRAG-Qwen2.5API/corpus_input:/app/corpus_input  # Shared corpus directory (read-write)
+    depends_on:
+      - opensearch
+      - ollama
+    networks:
+      - contextual-rag-network
+    restart: unless-stopped
+    command: streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+
+networks:
+  contextual-rag-network:
+    driver: bridge
+
+volumes:
+  opensearch-data:
+    driver: local
+  ollama-data:
+    driver: local

@@ -1,0 +1,52 @@
+# Project Information
+# This file contains quick reference information about the project
+
+PROJECT_NAME="AuthenticRAG"
+PROJECT_VERSION="1.0.0"
+PROJECT_STATUS="Production Ready"
+
+# Local Paths
+LOCAL_PATH="/Users/grizzlymacbookpro/2025-Dev-AnthropicContextualRAG-main"
+MAIN_PROJECT="AuthenticRAG-Qwen2.5API"
+CORPUS_PATH="AuthenticRAG-Qwen2.5API/corpus_input"
+
+# Quick Access Commands
+# cd ~/2025-Dev-AnthropicContextualRAG-main
+# cd ~/2025-Dev-AnthropicContextualRAG-main/AuthenticRAG-Qwen2.5API
+
+# GitHub
+GITHUB_REPO="https://github.com/aekanun2020/2026-ContextualRAG.git"
+GITHUB_USER="aekanun2020"
+GITHUB_REPO_NAME="2026-ContextualRAG"
+
+# OpenSearch
+OPENSEARCH_HOST="localhost"
+OPENSEARCH_PORT="9200"
+OPENSEARCH_INDEX="contextual_chunks"
+
+# API
+API_PROVIDER="AI For Thai"
+API_URL="https://api.aiforthai.in.th/v3/qwen-max"
+
+# Key Files
+MAIN_SCRIPT="onlysearchAuthenticRAG.py"
+TEST_SCRIPT="test_advanced_questions.py"
+SETUP_SCRIPT="setup.sh"
+REQUIREMENTS="requirements.txt"
+
+# Documentation
+README_MAIN="README.md"
+README_USER="README-USER.md"
+README_DEV="README-DEV.md"
+CHANGELOG="CHANGELOG.md"
+QUICKSTART="AuthenticRAG-Qwen2.5API/QUICKSTART.md"
+
+# Last Updated
+LAST_UPDATED="2026-03-07"
+MAINTAINER="Aekanun"
+
+# Notes
+# - OpenSearch must be running on localhost:9200
+# - API key required for Qwen API
+# - 53 documents currently indexed
+# - Python 3.8+ required

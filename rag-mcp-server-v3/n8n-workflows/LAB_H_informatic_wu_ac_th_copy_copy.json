@@ -1,0 +1,513 @@
+{
+  "name": "LAB-H-informatic-wu.ac.th copy copy",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1080,
+        220
+      ],
+      "id": "2a1c5f30-8bf5-43e2-887f-9c82d8b177d0",
+      "name": "When chat message received",
+      "webhookId": "1eebb194-6669-4b40-829d-66cc0bcf93bf"
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 2
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -340,
+        440
+      ],
+      "id": "66e9c4c6-3bf4-46db-9336-4a2ccc424163",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2966067a-7bb6-4316-8ad9-2b7681c7e0b9",
+              "leftValue": "={{$json[\"output\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4449be77-62c8-4da2-b119-936082f9d703",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// ตรวจสอบว่าเป็นรอบแรกหรือไม่\nif (!staticData.current_session_data) {\n    // รอบแรก: เก็บข้อมูลทั้งหมดจาก input\n    staticData.current_session_data = {\n        original_question: $json[\"chatInput\"],\n        sessionId: $json[\"userId\"] || \"default-session\",\n        startTime: new Date().toISOString()\n    };\n}\n\n// ส่งออกข้อมูลที่คงอยู่ทุกรอบ\nreturn [{\n    sessionId: staticData.current_session_data.sessionId,\n    original_question: staticData.current_session_data.original_question\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -780,
+        220
+      ],
+      "id": "476406d6-a532-4c97-bd6d-264db5c14015",
+      "name": "Question memorizer"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-oss-120b",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-oss-120b"
+        },
+        "options": {
+          "maxTokens": 8000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -520,
+        440
+      ],
+      "id": "fc9ee872-d1f8-4580-ba8c-ff9a46ee8d45",
+      "name": "OpenAI Chat Model by OpenRouter",
+      "credentials": {
+        "openAiApi": {
+          "id": "iHmuP7xVzwoJZ1u3",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "qwen/qwen-max",
+          "mode": "list",
+          "cachedResultName": "qwen/qwen-max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ],
+      "id": "effe030c-3ee4-477e-8a8e-be895ce6dc12",
+      "name": "OpenAI Chat Model by OpenRouter-1",
+      "credentials": {
+        "openAiApi": {
+          "id": "iHmuP7xVzwoJZ1u3",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "แสดงข้อมูลสรุปเกี่ยวกับฐานข้อมูล",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "get_database_info_tool"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        640
+      ],
+      "id": "6adfe475-e33f-4fd0-af6b-2e7584fd35a6",
+      "name": "get_database_info_tool",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "p10fCif8opvmm14l",
+          "name": "MCP Client (SSE) to MCP Server for MSSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Execute a read-only SQL query and return the results",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "execute_query_tool",
+        "toolParameters": "={{ (function() {\n const paramsString = $fromAI('Tool_Parameters');\n \n // Default query เพื่อดูรายชื่อตาราง\n const defaultParams = {\n   query: \"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME\"\n };\n \n if (!paramsString) {\n   return defaultParams;\n }\n \n try {\n   // ลองแปลง JSON ก่อน\n   const params = JSON.parse(paramsString);\n   return {\n     query: params.query || params.sql || params.statement || defaultParams.query\n   };\n } catch (e) {\n   // ถ้าแปลง JSON ไม่ได้ ถือว่าเป็น SQL string โดยตรง\n   if (typeof paramsString === 'string' && paramsString.trim().length > 0) {\n     return {\n       query: paramsString.trim()\n     };\n   }\n   return defaultParams;\n }\n})() }}"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        640
+      ],
+      "id": "0c52ec71-078f-4b1b-94a8-04faa6b28199",
+      "name": "execute_query_tool",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "p10fCif8opvmm14l",
+          "name": "MCP Client (SSE) to MCP Server for MSSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Preview sample data from a specific table with configurable row limit",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "preview_table",
+        "toolParameters": "={{ (function() {\n  const paramsString = $fromAI('Tool_Parameters');\n  \n  // Default สำหรับ preview_table\n  const defaultParams = {\n    table_name: \"allrawloanstat\",\n    limit: 10\n  };\n  \n  if (!paramsString) {\n    return defaultParams;\n  }\n  \n  try {\n    // ลองแปลง JSON ก่อน\n    const params = JSON.parse(paramsString);\n    return {\n      table_name: params.table_name || params.tableName || params.table || defaultParams.table_name,\n      limit: params.limit || params.row_count || params.rows || defaultParams.limit\n    };\n  } catch (e) {\n    // ถ้าแปลง JSON ไม่ได้ ลอง parse SQL query\n    if (typeof paramsString === 'string' && paramsString.trim().length > 0) {\n      const sql = paramsString.trim().toUpperCase();\n      \n      // หา table name จาก FROM clause\n      const fromMatch = sql.match(/FROM\\s+(\\w+)/);\n      const tableName = fromMatch ? fromMatch[1].toLowerCase() : defaultParams.table_name;\n      \n      // หา limit จาก TOP clause\n      const topMatch = sql.match(/TOP\\s+(\\d+)/);\n      const limit = topMatch ? parseInt(topMatch[1]) : defaultParams.limit;\n      \n      return {\n        table_name: tableName,\n        limit: limit\n      };\n    }\n    return defaultParams;\n  }\n})() }}"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        640
+      ],
+      "id": "f831b814-d49e-49e6-aaf1-5b8dd661b441",
+      "name": "preview_table",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "p10fCif8opvmm14l",
+          "name": "MCP Client (SSE) to MCP Server for MSSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "List all documentation sources currently stored",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "list_sources"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        20,
+        640
+      ],
+      "id": "721dd731-8719-43c6-a123-072a89da292c",
+      "name": "list_sources",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "G0OP4o4BwUGCP4EF",
+          "name": "MCP Client (SSE) to MCP Server for RAG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Add all supported files from a directory to the RAG database",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "add_directory",
+        "toolParameters": "={{ (function() {\n  const paramsString = $fromAI('Tool_Parameters');\n  \n  // Default path\n  const defaultParams = {\n    path: \"/home/user/documents\"\n  };\n  \n  if (!paramsString) {\n    return defaultParams;\n  }\n  \n  try {\n    // ลองแปลง JSON ก่อน\n    const params = JSON.parse(paramsString);\n    return {\n      path: params.path || defaultParams.path\n    };\n  } catch (e) {\n    // ถ้าแปลง JSON ไม่ได้ ถือว่าเป็น path string โดยตรง\n    if (typeof paramsString === 'string' && paramsString.trim().length > 0) {\n      return {\n        path: paramsString.trim()\n      };\n    }\n    return defaultParams;\n  }\n})() }}"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        160,
+        640
+      ],
+      "id": "822bff6b-9189-43a2-9c7e-3394c05924ab",
+      "name": "add_directory",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "G0OP4o4BwUGCP4EF",
+          "name": "MCP Client (SSE) to MCP Server for RAG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search through stored documentation",
+        "connectionType": "sse",
+        "operation": "executeTool",
+        "toolName": "search_documentation",
+        "toolParameters": "={{ (function() {\n  const paramsString = $fromAI('Tool_Parameters');\n  \n  // Default parameters\n  const defaultParams = {\n    query: \"search term\",\n    limit: 10\n  };\n  \n  if (!paramsString) {\n    return defaultParams;\n  }\n  \n  try {\n    // ลองแปลง JSON ก่อน\n    const params = JSON.parse(paramsString);\n    return {\n      query: params.query || params.search || params.keyword || defaultParams.query,\n      limit: params.limit || params.max || params.count || defaultParams.limit\n    };\n  } catch (e) {\n    // ถ้าแปลง JSON ไม่ได้ ถือว่าเป็น search string โดยตรง\n    if (typeof paramsString === 'string' && paramsString.trim().length > 0) {\n      return {\n        query: paramsString.trim(),\n        limit: defaultParams.limit\n      };\n    }\n    return defaultParams;\n  }\n})() }}"
+      },
+      "type": "n8n-nodes-mcp.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        300,
+        640
+      ],
+      "id": "d3547c5f-d58f-47b7-b649-89d758dd2751",
+      "name": "search_documentation",
+      "credentials": {
+        "mcpClientSseApi": {
+          "id": "G0OP4o4BwUGCP4EF",
+          "name": "MCP Client (SSE) to MCP Server for RAG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AAYM5AMU2",
+          "mode": "list",
+          "cachedResultName": "informatics-wu"
+        },
+        "text": "={{ $('Validator Agent').first().json.output }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        220
+      ],
+      "id": "45c4310d-c14d-4dfa-be53-73d4a211e966",
+      "name": "Slack",
+      "webhookId": "e4c66ca2-fca7-44fa-a250-758b515ef713",
+      "credentials": {
+        "slackApi": {
+          "id": "vESD7JvfKKoez1ju",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$json[\"original_question\"]}}",
+        "options": {
+          "systemMessage": "=CORE IDENTITY\nYou are a professional Documentation Management Agent with RAG (Retrieval-Augmented Generation) capabilities. Your primary goals are EFFICIENT DOCUMENTATION MANAGEMENT, ACCURATE RETRIEVAL, and COMPREHENSIVE KNOWLEDGE BASE BUILDING.\n\nTOOL USAGE REQUIREMENT\nYou MUST use documentation tools for every documentation-related request. You cannot provide documentation analysis without using the actual tools.\n\nAVAILABLE TOOLS\n1. add_documentation - Add documentation from a URL to the RAG database\n2. search_documentation - Search through stored documentation\n3. list_sources - List all documentation sources currently stored\n4. add_directory - Add all supported files from a directory to the RAG database\n\nMANDATORY OUTPUT FORMAT\nEvery operation MUST include:\nREQUEST: [restate user request]\nTOOL SELECTED: [which tool and why]\nPARAMETERS USED:\n[exact parameters in JSON format]\nEXECUTION STATUS: [SUCCESS/FAILED/ERROR]\nRAW RESULTS: [actual response from tool]\nACTION SUMMARY: [what was accomplished or what went wrong]\nNEXT STEPS: [recommendations for follow-up actions if needed]\n\nWORKFLOW PATTERNS\n\nPattern 1: Adding New Documentation\n- Use add_documentation for URLs\n- Use add_directory for local folders\n- Always verify with list_sources after adding\n\nPattern 2: Searching Documentation\n- First use list_sources to understand available sources\n- Then use search_documentation with relevant queries\n- Refine search if initial results insufficient\n\nPattern 3: Knowledge Base Maintenance\n- Regularly list_sources to audit content\n- Search before adding to avoid duplicates\n- Build comprehensive coverage systematically\n\nERROR HANDLING\n- If add fails: Check URL/path validity\n- If search returns empty: Try broader terms\n- If tool errors: Report exact error message\n- Always provide alternative approaches",
+          "maxIterations": 50
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -440,
+        220
+      ],
+      "id": "65df7c9d-b4b1-4f67-86e8-93d5426da036",
+      "name": "RAG Agent",
+      "alwaysOutputData": false,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=คุณเป็น Quality Assurance & Synthesis Agent\n\n═══════════════════════════════════════════════════════════════\nINPUT จาก RAG Agent\n═══════════════════════════════════════════════════════════════\n\n{{ $('RAG Agent').first().json.output }}\n\n═══════════════════════════════════════════════════════════════\nงานของคุณ\n═══════════════════════════════════════════════════════════════\n\nขั้นตอนที่ 1: VALIDATE — ตรวจสอบความถูกต้อง\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- อ่าน RAW RESULTS อย่างละเอียด\n- เปรียบเทียบกับ ACTION SUMMARY\n- ระบุข้อมูลที่อยู่ใน ACTION SUMMARY แต่ไม่มีใน RAW RESULTS\n- ข้อมูลเหล่านั้นต้องแยกไปใส่ในส่วน \"ข้อเสนอแนะ\" ไม่ใช่ \"คำตอบ\"\n\nขั้นตอนที่ 2: SYNTHESIZE — สังเคราะห์คำตอบ\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- ตอบคำถามใน REQUEST โดยใช้เฉพาะข้อมูลจาก RAW RESULTS\n- จัดโครงสร้างให้อ่านง่าย:\n  • ถ้าเป็นคำถามเปรียบเทียบ → ใช้ตาราง\n  • ถ้าเป็นคำถามขั้นตอน → ใช้ลำดับหมายเลข\n  • ถ้าเป็นคำถาม decision tree → ใช้ flowchart หรือ tree structure\n- ใช้ภาษาที่เข้าใจง่าย กระชับ ตรงประเด็น\n\nขั้นตอนที่ 3: IDENTIFY GAPS — ระบุช่องว่าง\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- ข้อมูลอะไรที่ควรมีเพื่อตอบคำถามได้สมบูรณ์ แต่ไม่พบใน RAW RESULTS?\n- ระบุให้ชัดเจนว่าขาดอะไร\n\nขั้นตอนที่ 4: SEPARATE — แยกข้อเสนอแนะ\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- หาก Agent 1 ใส่ NEXT STEPS หรือข้อมูลที่ไม่มีใน RAW RESULTS\n- ให้แยกไปใส่ในส่วน \"ข้อเสนอแนะเพิ่มเติม\"\n- ระบุชัดเจนว่า ⚠️ \"ไม่ได้มาจากเอกสาร\"\n\n═══════════════════════════════════════════════════════════════\nข้อควรระวังพิเศษ\n═══════════════════════════════════════════════════════════════\n\nห้ามใส่ในส่วน \"คำตอบ\" หากไม่มีใน RAW RESULTS:\n❌ ระยะเวลา (เช่น \"2-3 วันทำการ\", \"ภายใน 24 ชั่วโมง\")\n❌ ขั้นตอนเพิ่มเติม (เช่น \"ทำ Log\", \"ส่ง Receipt\", \"บันทึกข้อมูล\")\n❌ เงื่อนไขเพิ่มเติม (เช่น \"หากเกินวงเงิน\", \"วงเงิน > limit\")\n❌ ข้อความแจ้งลูกค้าที่คิดเอง\n❌ ผลกระทบที่ไม่ได้ระบุในเอกสาร\n\nหากไม่แน่ใจ → ให้ระบุว่า \"ไม่พบในเอกสาร\" แทนการคาดเดา",
+        "options": {
+          "systemMessage": "=คุณเป็น Quality Assurance & Synthesis Agent ทำหน้าที่ตรวจสอบความถูกต้องและสังเคราะห์คำตอบจากข้อมูลที่ RAG Agent ดึงมา\n\n═══════════════════════════════════════════════════════════════\nหน้าที่หลัก\n═══════════════════════════════════════════════════════════════\n\n1. VALIDATE — ตรวจสอบว่าข้อมูลใน ACTION SUMMARY มีที่มาจาก RAW RESULTS จริงหรือไม่\n2. SYNTHESIZE — สังเคราะห์คำตอบที่ตรงคำถามของผู้ใช้ โดยใช้เฉพาะข้อมูลจาก RAW RESULTS\n3. SEPARATE — แยก \"ข้อมูลจากเอกสาร\" กับ \"ข้อเสนอแนะที่ Agent คิดเอง\" ให้ชัดเจน\n4. IDENTIFY GAPS — ระบุข้อมูลที่ขาดหายหรือไม่พบในเอกสาร\n\n═══════════════════════════════════════════════════════════════\nกฎสำคัญ (CRITICAL RULES)\n═══════════════════════════════════════════════════════════════\n\n✅ ต้องทำ:\n- ใช้เฉพาะข้อมูลที่ปรากฏใน RAW RESULTS เท่านั้นสำหรับส่วน \"คำตอบ\"\n- ระบุ \"ไม่พบในเอกสาร\" อย่างชัดเจนเมื่อข้อมูลไม่ครบ\n- แยกข้อเสนอแนะของ Agent 1 (NEXT STEPS) ไปไว้ส่วนท้ายอย่างชัดเจน\n- อ้างอิงแหล่งที่มาของข้อมูลทุกครั้งที่เป็นไปได้\n\n❌ ห้ามทำ:\n- ห้ามเพิ่มตัวเลข ระยะเวลา ที่ไม่มีในเอกสาร (เช่น \"2-3 วันทำการ\", \"ภายใน 24 ชั่วโมง\")\n- ห้ามเพิ่มขั้นตอนที่ไม่มีในเอกสาร (เช่น \"ทำ Log\", \"ส่ง Receipt\", \"ส่ง Email\")\n- ห้ามเพิ่มเงื่อนไขที่ไม่มีในเอกสาร (เช่น \"วงเงิน > limit\", \"หากเกินวงเงิน\")\n- ห้ามสมมติหรือคาดเดาข้อมูลที่ไม่มี\n\n═══════════════════════════════════════════════════════════════\nรูปแบบการตอบ (OUTPUT FORMAT)\n═══════════════════════════════════════════════════════════════\n\n## คำตอบ (จากเอกสาร)\n[สังเคราะห์คำตอบจาก RAW RESULTS เท่านั้น]\n[จัดโครงสร้างให้เหมาะสม: ขั้นตอน, ตาราง, หัวข้อย่อย ตามความเหมาะสมของคำถาม]\n\n## ข้อมูลที่ไม่พบในเอกสาร\n[ระบุข้อมูลที่ควรมีเพื่อตอบคำถามได้สมบูรณ์ แต่ไม่พบใน RAW RESULTS]\n[ถ้าข้อมูลครบถ้วน ให้ระบุ \"ไม่มี — ข้อมูลครบถ้วน\"]\n\n## ข้อเสนอแนะเพิ่มเติม (ไม่ได้มาจากเอกสาร)\n⚠️ ส่วนนี้ไม่ใช่ข้อมูลจากเอกสาร — เป็นข้อเสนอแนะจาก AI Agent\n[ข้อมูลจาก NEXT STEPS ของ Agent 1 หรือคำแนะนำทั่วไป]\n[ถ้าไม่มี ให้ระบุ \"ไม่มี\"]\n\n## ระดับความเชื่อมั่น\n[สูง / ปานกลาง / ต่ำ] — [เหตุผลสั้นๆ]\n\n═══════════════════════════════════════════════════════════════\nวิธีตรวจสอบข้อมูล (VALIDATION CHECKLIST)\n═══════════════════════════════════════════════════════════════\n\nสำหรับทุกข้อมูลที่จะใส่ในส่วน \"คำตอบ\" ให้ถามตัวเองว่า:\n□ ข้อมูลนี้ปรากฏใน RAW RESULTS หรือไม่?\n□ ถ้าเป็นตัวเลข/ระยะเวลา — มีระบุใน RAW RESULTS จริงหรือไม่?\n□ ถ้าเป็นขั้นตอน — ขั้นตอนนี้มีใน RAW RESULTS หรือคิดเองเพิ่ม?\n□ ถ้าเป็นเงื่อนไข — เงื่อนไขนี้มาจาก RAW RESULTS หรือสมมติขึ้น?\n\nหากตอบ \"ไม่\" ข้อใดข้อหนึ่ง → ห้ามใส่ในส่วน \"คำตอบ\""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        280,
+        220
+      ],
+      "id": "a8af551c-850f-4325-9252-b6f4d69050d2",
+      "name": "Validator Agent"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Question memorizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Question memorizer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question memorizer": {
+      "main": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model by OpenRouter": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model by OpenRouter-1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Validator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_database_info_tool": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "execute_query_tool": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "preview_table": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "list_sources": {
+      "ai_tool": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add_directory": {
+      "ai_tool": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search_documentation": {
+      "ai_tool": [
+        [
+          {
+            "node": "RAG Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG Agent": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validator Agent": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3fa1e05b-1056-4991-ab6b-65fdff6c9466",
+  "meta": {
+    "instanceId": "bed70c3d5932f0a13090eaa7ba831381631f32763677bf2351959e70c502aea7"
+  },
+  "id": "TztlxZiT7LzKyTUW",
+  "tags": [
+    {
+      "createdAt": "2025-11-14T01:05:46.911Z",
+      "updatedAt": "2025-11-14T01:05:46.911Z",
+      "id": "61eKOcibJk5Xh2JU",
+      "name": "tested@10Sep2025"
+    },
+    {
+      "createdAt": "2025-11-13T14:56:07.988Z",
+      "updatedAt": "2025-11-13T14:56:07.988Z",
+      "id": "Wl6wS6PK5KlNbCz6",
+      "name": "in-progress"
+    },
+    {
+      "createdAt": "2025-11-14T01:05:46.917Z",
+      "updatedAt": "2025-11-14T01:05:46.917Z",
+      "id": "pAnndpROLQK9UKah",
+      "name": "tested@8Sep2025"
+    }
+  ]
+}
