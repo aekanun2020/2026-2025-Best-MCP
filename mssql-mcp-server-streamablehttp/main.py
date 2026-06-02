@@ -152,22 +152,22 @@ async def handle_post(request: Request):
 
     method = message.get("method")
 
-    # Session handling. A session ID is assigned at initialization and must be
-    # echoed by the client on all subsequent requests via the Mcp-Session-Id header.
+    # Stateless session handling (matches FastMCP's stateless_http=True).
+    # The server does NOT require clients to track or echo an Mcp-Session-Id:
+    # every request is processed independently. On initialize we still mint a
+    # session id and return it in the response header, so spec-compliant
+    # stateful clients can use it if they wish -- but clients that omit it
+    # (e.g. simple Streamable HTTP clients) are accepted, not rejected. This
+    # avoids the 400 "Missing Mcp-Session-Id header" that stateful mode raised.
     session_id = request.headers.get("mcp-session-id")
 
     if method == "initialize":
-        # Start a new session
+        # Mint a session id for clients that want to track one (optional).
         session_id = str(uuid.uuid4())
         mcp_sessions[session_id] = {"queue": asyncio.Queue()}
-        logger.info(f"New MCP session: {session_id}")
-    else:
-        # Non-initialize requests require a valid session ID
-        if session_id is None:
-            raise HTTPException(status_code=400, detail="Missing Mcp-Session-Id header")
-        if session_id not in mcp_sessions:
-            # Session expired or unknown -> client must start a new session
-            raise HTTPException(status_code=404, detail="Session not found")
+        logger.info(f"New MCP session (stateless mode): {session_id}")
+    # Non-initialize requests are accepted with or without a session id.
+    # (No 400/404 enforcement -- stateless.)
 
     # If the input is a notification or response (no id), accept with 202.
     if "id" not in message or message.get("id") is None:
@@ -199,13 +199,17 @@ async def handle_get(request: Request):
 
 
 async def handle_delete(request: Request):
-    """Handle DELETE requests to explicitly terminate a session."""
+    """Handle DELETE requests to explicitly terminate a session.
+
+    Stateless mode: there is no mandatory session, so termination is a no-op
+    that always succeeds. If the client did track a minted session id we clean
+    it up; either way we return 200.
+    """
     session_id = request.headers.get("mcp-session-id")
     if session_id and session_id in mcp_sessions:
         del mcp_sessions[session_id]
         logger.info(f"Terminated MCP session: {session_id}")
-        return Response(status_code=200)
-    return Response(status_code=404)
+    return Response(status_code=200)
 
 
 async def process_mcp_message(message: dict) -> Optional[dict]:

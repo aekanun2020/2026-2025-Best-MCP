@@ -55,11 +55,18 @@ DB_PASSWORD=your_password
 
 ## API Endpoints
 
-- `POST /mcp` - MCP message endpoint (Streamable HTTP)
+- `POST /mcp` - MCP message endpoint (Streamable HTTP, **stateless**)
 - `GET /mcp` - SSE stream endpoint (returns 405 if the server does not offer a stream)
-- `DELETE /mcp` - Terminate an MCP session
+- `DELETE /mcp` - Terminate an MCP session (no-op when stateless; always returns 200)
 - `GET /health` - Health check endpoint
 - `GET /` - API documentation
+
+### Session handling (stateless)
+
+This server runs in **stateless** mode (similar to FastMCP's `stateless_http=True`).
+An `Mcp-Session-Id` is minted and returned on `initialize` for compatibility,
+but subsequent requests are accepted **with or without** the `Mcp-Session-Id` header.
+This lets clients that do not echo back the session id (e.g. PyClaw's Streamable HTTP path) work without modification.
 
 **Note:** When using Docker, the server runs internally on port 8000 but is exposed externally on port 9000.
 

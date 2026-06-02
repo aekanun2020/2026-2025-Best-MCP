@@ -16,6 +16,7 @@ database (`TestDB`, 1,432,440 rows in `loans_fact`) reached through a Cloudflare
 | `01_init_and_tools.png` | initialize, notifications/initialized, tools/list, and all 5 tools |
 | `02_resources_protocol_prompts.png` | resources/list+read, protocol checks (GET/no-session/bad-session/DELETE), prompts |
 | `03_docker_container_run.png` | **Docker run via `./start_docker.sh`** — build, container health, and full 16/16 test against the running container |
+| `04_stateless_pyclaw_flow.png` | **Stateless verification** — PyClaw-style flow with NO `Mcp-Session-Id` header now succeeds (was HTTP 400 before fix) |
 
 ## Docker deployment test (`./start_docker.sh`)
 
@@ -34,12 +35,16 @@ then the full test suite was fired at the running container.
 ### Session lifecycle / protocol
 | # | Check | Expected | Result |
 |---|-------|----------|--------|
-| 1 | `initialize` | 200 + `Mcp-Session-Id` returned | PASS |
+| 1 | `initialize` | 200 + `Mcp-Session-Id` minted (optional) | PASS |
 | 2 | `notifications/initialized` | 202, empty body | PASS |
 | 13 | `GET /mcp` | 405 (no server-initiated stream) | PASS |
-| 14 | request with **no** session header | 400 "Missing Mcp-Session-Id header" | PASS |
-| 15 | request with **bad** session | 404 "Session not found" | PASS |
-| 16 | `DELETE /mcp` | 200 (session terminated) | PASS |
+| 14 | request with **no** session header | 200 (stateless: accepted) | PASS |
+| 15 | request with **arbitrary** session | 200 (stateless: accepted) | PASS |
+| 16 | `DELETE /mcp` | 200 (no-op when stateless) | PASS |
+
+> **Note (stateless mode):** the server runs stateless (like FastMCP's `stateless_http=True`).
+> Requests are accepted with or without `Mcp-Session-Id`, so clients that do not echo the
+> session header (e.g. PyClaw's Streamable HTTP path) work without modification.
 
 ### Tools (5)
 | # | Tool | Test | Result |
