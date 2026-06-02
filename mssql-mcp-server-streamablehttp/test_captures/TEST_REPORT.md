@@ -15,6 +15,19 @@ database (`TestDB`, 1,432,440 rows in `loans_fact`) reached through a Cloudflare
 |------|----------|
 | `01_init_and_tools.png` | initialize, notifications/initialized, tools/list, and all 5 tools |
 | `02_resources_protocol_prompts.png` | resources/list+read, protocol checks (GET/no-session/bad-session/DELETE), prompts |
+| `03_docker_container_run.png` | **Docker run via `./start_docker.sh`** — build, container health, and full 16/16 test against the running container |
+
+## Docker deployment test (`./start_docker.sh`)
+
+The server was also built and run as a **Docker container** exactly as the install manual
+prescribes (`./start_docker.sh` → `docker compose build --no-cache` → `docker compose up`),
+then the full test suite was fired at the running container.
+
+- **Image:** `mssql-mcp-server-streamablehttp-mcp-server:latest` (375 MB, python:3.11-slim, non-root `mcpuser`)
+- **Container:** `mssql-mcp-streamable-http`, status **healthy** (healthcheck on `/health`)
+- **Port:** container `8000` exposed on host; manual specifies `9000:8000`. In the test sandbox host port 9000 was already occupied by a system process, so the container was published on `9001:8000` for the external test. The internal port and all app behaviour are unchanged.
+- **DB connectivity:** container reached the live SQL Server through the host gateway → Cloudflare tunnel (`DB_SERVER=172.17.0.1:14333`); cache refresh found 6 tables.
+- **Result:** **16 / 16 checks PASSED** against the container (see `03_docker_container_run.png`).
 
 ## What was tested
 
