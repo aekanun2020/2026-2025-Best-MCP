@@ -149,17 +149,28 @@ This lets clients that do not echo back the session id (e.g. PyClaw's Streamable
 
 ## MCP Client Configuration
 
-For Claude Desktop or other MCP clients, use:
+For Claude Desktop or other MCP clients, connect through `mcp-remote` (it bridges a
+Streamable HTTP server into the stdio interface these clients expect):
 
 ```json
 {
   "mcpServers": {
     "mssql-streamable-http": {
-      "url": "http://localhost:9000/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:9000/mcp",
+        "--allow-http"
+      ]
     }
   }
 }
 ```
+
+Replace `localhost` with the server's IP (e.g. a LAN or Tailscale address) if the client
+runs on a different machine than the server. `--allow-http` is required because the
+server is served over plain HTTP, not HTTPS.
 
 ## License
 
