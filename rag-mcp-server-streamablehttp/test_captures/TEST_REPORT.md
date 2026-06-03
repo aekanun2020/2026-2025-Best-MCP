@@ -6,7 +6,7 @@
 - **Protocol version:** `2025-11-25`
 - **Embedding:** Ollama `nomic-embed-text` (vector size 768)
 - **Vector DB:** Qdrant (collection `documentation`)
-- **Container:** `rag-mcp-streamable-http`, expose port `9000` (ในการทดสอบนี้ map host port `9002` เพราะ host `9000` ถูกใช้งานอยู่)
+- **Container:** `rag-mcp-streamable-http`, expose port `8000` (ในการทดสอบนี้ map host port `9002` ชั่วคราว เพราะ host port มาตรฐานถูกใช้งานใน sandbox ขณะทดสอบ)
 
 ## Result: 9/9 checks passed
 
@@ -66,5 +66,5 @@ docker exec pyrag-ollama ollama pull nomic-embed-text
 ./start_docker.sh        # Mac    (Windows: double-click start_docker.bat)
 
 # 3) run the test suite
-python test_all_tools.py http://localhost:9000/mcp
+python test_all_tools.py http://localhost:8000/mcp
 ```

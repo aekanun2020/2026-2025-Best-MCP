@@ -2,13 +2,13 @@
 """End-to-end test for RAG MCP Streamable HTTP server (stateless).
 
 Tests protocol handshake + all 4 tools against a running container.
-Usage: python test_all_tools.py [base_url]   (default http://localhost:9000/mcp)
+Usage: python test_all_tools.py [base_url]   (default http://localhost:8000/mcp)
 """
 import sys
 import json
 import httpx
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:9000/mcp"
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/mcp"
 ROOT = BASE.rsplit("/mcp", 1)[0]
 
 HDR = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}

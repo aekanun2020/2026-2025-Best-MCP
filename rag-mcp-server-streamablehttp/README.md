@@ -27,7 +27,7 @@ MCP server สำหรับค้นหาเอกสาร (RAG) แบบ *
 > **Prerequisites:**
 > 1. ติดตั้งและเปิด **Docker Desktop** ก่อน ([Mac](https://docs.docker.com/desktop/install/mac-install/) / [Windows](https://docs.docker.com/desktop/install/windows-install/))
 > 2. มี **Qdrant** รันอยู่ที่ port **6333** และ **Ollama** รันอยู่ที่ port **11434** บนเครื่อง host (รันแยกไว้ก่อน) และ pull embedding model ไว้: `ollama pull nomic-embed-text`
-> 3. port **9000** บนเครื่องว่าง
+> 3. port **8000** บนเครื่องว่าง
 
 ขั้นตอน Windows กับ Mac ต่างกันเล็กน้อย ทำตามหัวข้อของ OS ตัวเอง
 
@@ -57,7 +57,7 @@ cd 2026-2025-Best-MCP\rag-mcp-server-streamablehttp
 
 **3. เสร็จ**
 
-เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:9000/mcp**
+เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:8000/mcp**
 เปิดหน้าต่าง CMD ค้างไว้ — **ปิดหน้าต่าง = server หยุด** ถ้าจะหยุดให้ปิดหน้าต่างหรือกด `Ctrl + C`
 
 ---
@@ -84,7 +84,7 @@ script จะสร้าง `.env` จาก `.env.example` (ถ้ายัง
 
 **3. เสร็จ**
 
-เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:9000/mcp**
+เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:8000/mcp**
 เปิด Terminal ค้างไว้ — ปิดหน้าต่าง (หรือกด `Ctrl + C`) = server หยุด
 
 ---
@@ -153,7 +153,7 @@ Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateles
 แต่ request ถัดไป (`tools/list`, `tools/call`) จะคืน JSON response ตรงๆ **โดยไม่บังคับ** header นี้
 ทำให้ client ที่ไม่ได้ส่ง session id กลับมา (เช่น Streamable HTTP path ของ PyClaw) ต่อได้โดยไม่ต้องแก้อะไร
 
-> **Note:** บน Docker server รันภายในที่ port **8000** แต่ expose ออกมาภายนอกที่ port **9000**
+> **Note:** บน Docker server รันที่ port **8000** ทั้งภายใน container และ expose ออกมาภายนอก (ตรงกับ rag-mcp-server-v3)
 
 ## MCP Client Configuration
 
@@ -167,7 +167,7 @@ Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateles
       "args": [
         "-y",
         "mcp-remote",
-        "http://localhost:9000/mcp",
+        "http://localhost:8000/mcp",
         "--allow-http"
       ]
     }

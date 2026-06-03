@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   mcp-server:
     build: .
     container_name: rag-mcp-streamable-http
     ports:
-      - "9000:8000"
+      - "8000:8000"
     environment:
       # External Qdrant + Ollama (ต้องรันแยกไว้ก่อน / must be running externally)
       - QDRANT_URL=${QDRANT_URL:-http://host.docker.internal:6333}
