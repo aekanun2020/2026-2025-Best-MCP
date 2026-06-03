@@ -20,38 +20,82 @@ A Model Context Protocol (MCP) server that provides SQL Server database access t
   - Data analysis templates
   - SQL query generation
 
-## Quick Start
+## Installation
 
-### Using Docker Compose
+> **Prerequisites:** Install and start **Docker Desktop** first ([Mac](https://docs.docker.com/desktop/install/mac-install/) / [Windows](https://docs.docker.com/desktop/install/windows-install/)). Make sure your SQL Server is running on the host machine and listening on port **1433**, and that local port **9000** is free.
 
-```bash
-docker-compose up
+The steps differ slightly between Windows and Mac. Follow the section for your OS.
+
+---
+
+### Windows (double-click)
+
+**1. Download the project from GitHub**
+
+Open `Command Prompt` (CMD) and run:
+
+```cmd
+git clone https://github.com/aekanun2020/2026-2025-Best-MCP.git
+cd 2026-2025-Best-MCP\mssql-mcp-server-streamablehttp
 ```
 
-### Manual Installation
+(No Git? Click the green **Code ▾** button on the [repo page](https://github.com/aekanun2020/2026-2025-Best-MCP) → **Download ZIP** → unzip → open the `mssql-mcp-server-streamablehttp` folder.)
+
+**2. Start the server**
+
+Open the `mssql-mcp-server-streamablehttp` folder in File Explorer and **double-click `start_docker.bat`**.
+
+A CMD window opens and does everything for you:
+- creates `.env` from `.env.example` (if it doesn't exist yet)
+- builds the Docker image
+- starts the container and streams its logs
+
+**3. Done**
+
+The server is running at **http://localhost:9000/mcp** once you see the health logs.
+Keep the CMD window open — **closing it stops the server.** To stop, close the window or press `Ctrl + C`.
+
+---
+
+### Mac (Terminal)
+
+**1. Download the project from GitHub**
+
+Open `Terminal` and run:
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the server
-python main.py
+git clone https://github.com/aekanun2020/2026-2025-Best-MCP.git
+cd 2026-2025-Best-MCP/mssql-mcp-server-streamablehttp
 ```
 
-## Configuration
+**2. Start the server**
 
-Create a `.env` file with your database configuration:
+```bash
+chmod +x start_docker.sh   # only needed the first time
+./start_docker.sh
+```
+
+The script creates `.env` from `.env.example` (if missing), builds the image, starts the container, and streams its logs.
+
+**3. Done**
+
+The server is running at **http://localhost:9000/mcp** once you see the health logs.
+Keep the Terminal open — closing it (or pressing `Ctrl + C`) stops the server.
+
+---
+
+### Database configuration
+
+The installer copies [`.env.example`](.env.example) to `.env` for you, pre-set for a SQL Server running on the **same machine** as Docker Desktop:
 
 ```env
-DB_SERVER=your_server_address
-DB_NAME=your_database_name
-DB_USER=your_username
-DB_PASSWORD=your_password
+DB_SERVER=host.docker.internal
+DB_NAME=TestDB
+DB_USER=SA
+DB_PASSWORD=Passw0rd123456
 ```
+
+`host.docker.internal` lets the container reach SQL Server on your host machine. If your database lives elsewhere, edit `.env` (then re-run the start script) and change `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` accordingly.
 
 ## API Endpoints
 
