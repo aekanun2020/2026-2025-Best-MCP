@@ -84,12 +84,116 @@ async def initialize_rag_services():
         storage_service.vector_size = vector_size
         
         await storage_service.initialize()
-        initialize_services(embedding_service, storage_service)
+        
+        # NEW: Initialize hybrid search components
+        logger.info("Initializing hybrid search components...")
+        from pyragdoc.utils.thai_tokenizer import ThaiTokenizer
+        from pyragdoc.core.bm25 import BM25Retriever
+        from pyragdoc.core.rrf import RRFCombiner
+        from pyragdoc.core.search import SearchOrchestrator
+        
+        # Create Thai tokenizer
+        thai_tokenizer = ThaiTokenizer()
+        
+        # Create BM25 retriever
+        bm25_retriever = BM25Retriever(thai_tokenizer)
+        
+        # Create RRF combiner
+        rrf_combiner = RRFCombiner(k=60)
+        
+        # Create search orchestrator
+        search_orchestrator = SearchOrchestrator(
+            bm25_retriever=bm25_retriever,
+            storage_service=storage_service,
+            embedding_service=embedding_service,
+            rrf_combiner=rrf_combiner,
+            default_mode="hybrid"
+        )
+        
+        # Build BM25 index from existing Qdrant documents
+        await build_bm25_index(bm25_retriever, storage_service)
+        
+        # Initialize app services
+        initialize_services(embedding_service, storage_service, search_orchestrator)
         
         logger.info("RAG services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise
+
+
+async def build_bm25_index(bm25_retriever, storage_service):
+    """Build BM25 index from existing Qdrant documents with pagination"""
+    try:
+        logger.info("Building BM25 index from existing documents...")
+        
+        from pyragdoc.models.documents import DocumentChunk, DocumentMetadata
+        import datetime
+        
+        all_chunks = []
+        offset = None
+        batch_size = 1000
+        total_processed = 0
+        
+        # Paginate through all documents
+        while True:
+            # Scroll with offset for pagination
+            scroll_result = await asyncio.to_thread(
+                storage_service.client.scroll,
+                collection_name=storage_service.collection_name,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            points, next_offset = scroll_result
+            
+            if not points:
+                break
+            
+            # Convert points to DocumentChunk objects
+            for point in points:
+                payload = point.payload
+                
+                # Extract metadata
+                metadata_dict = payload.get("metadata", {})
+                metadata = DocumentMetadata(**metadata_dict)
+                
+                # Extract text and timestamp
+                text = payload.get("text", "")
+                timestamp_str = payload.get("timestamp")
+                timestamp = datetime.datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.datetime.now()
+                
+                # Create DocumentChunk
+                chunk = DocumentChunk(
+                    text=text,
+                    metadata=metadata,
+                    id=str(point.id),
+                    timestamp=timestamp
+                )
+                all_chunks.append(chunk)
+            
+            total_processed += len(points)
+            logger.info(f"Loaded {total_processed} documents from Qdrant...")
+            
+            # Check if there are more documents
+            if next_offset is None:
+                break
+            
+            offset = next_offset
+        
+        # Index all documents in BM25
+        if all_chunks:
+            logger.info(f"Building BM25 index for {len(all_chunks)} documents...")
+            await bm25_retriever.index_documents(all_chunks)
+            logger.info(f"✅ BM25 index built successfully with {len(all_chunks)} documents")
+        else:
+            logger.info("No documents to index in BM25")
+            
+    except Exception as e:
+        logger.error(f"Failed to build BM25 index: {e}", exc_info=True)
+        logger.warning("⚠️  Continuing without BM25 index - hybrid search will fall back to semantic only")
 
 @app.get("/health")
 async def health_check():
