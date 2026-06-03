@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rag-streamable-http": {
+      "url": "http://localhost:9000/mcp",
+      "transport": "streamable-http"
+    }
+  }
+}

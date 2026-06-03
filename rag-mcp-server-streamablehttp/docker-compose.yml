@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build: .
+    container_name: rag-mcp-streamable-http
+    ports:
+      - "9000:8000"
+    environment:
+      # External Qdrant + Ollama (ต้องรันแยกไว้ก่อน / must be running externally)
+      - QDRANT_URL=${QDRANT_URL:-http://host.docker.internal:6333}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-ollama}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENVIRONMENT=production
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  mcp-network:
+    driver: bridge
