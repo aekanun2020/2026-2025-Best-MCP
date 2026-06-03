@@ -224,6 +224,8 @@ Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateles
 
 ## วิธีใช้งาน (Usage)
 
+> 📘 **อยากทดสอบทีละขั้นแบบ copy คำสั่งได้เลย?** ดู [TESTING_GUIDE.md](TESTING_GUIDE.md) — คู่มือทดสอบ 5 ขั้น (health → initialize → tools/list → add_directory → search ทั้ง 3 mode) พร้อม output จริงและคำอธิบาย score/log
+
 หลัง server รันแล้ว ใช้งานได้ 2 ทาง: ผ่าน **MCP client** (เช่น Claude Desktop, PyClaw) หรือ **เรียกตรงด้วย curl** เพื่อทดสอบ
 
 ### ขั้นตอนใช้งานพื้นฐาน
