@@ -97,6 +97,39 @@ DB_PASSWORD=Passw0rd123456
 
 `host.docker.internal` lets the container reach SQL Server on your host machine. If your database lives elsewhere, edit `.env` (then re-run the start script) and change `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` accordingly.
 
+## Managing the container
+
+The container name is **`mssql-mcp-streamable-http`**. Run these from the `mssql-mcp-server-streamablehttp` folder.
+
+```bash
+# Check status / health
+docker ps
+
+# View live logs
+docker logs -f mssql-mcp-streamable-http
+
+# Stop the server (keeps the container so you can start it again)
+docker compose stop
+
+# Start it again later
+docker compose start
+```
+
+## Re-running with a new configuration
+
+If you change `.env` (for example a different `DB_SERVER` or password), apply the new
+configuration by **rebuilding and recreating** the container in place:
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
+> **Do NOT run `docker compose down`.** `down` removes the container together with its
+> network (and can drop other associated resources), which is unnecessary and can
+> interrupt anything else relying on it. `up -d --build --force-recreate` already
+> recreates the container in place with your new `.env`/config — this is the only command
+> you need to re-apply changes.
+
 ## API Endpoints
 
 - `POST /mcp` - MCP message endpoint (Streamable HTTP, **stateless**)
@@ -126,20 +159,6 @@ For Claude Desktop or other MCP clients, use:
     }
   }
 }
-```
-
-## Development
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-### Building Docker Image
-
-```bash
-docker build -t mssql-mcp-streamable-http .
 ```
 
 ## License
