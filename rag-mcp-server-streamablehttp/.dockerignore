@@ -33,11 +33,6 @@ htmlcov/
 .tox/
 .mypy_cache/
 
-# Documentation
-docs/
-*.md
-!README.md
-
 # Git
 .git/
 .gitignore

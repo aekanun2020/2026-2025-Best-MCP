@@ -40,6 +40,9 @@ COPY --from=builder /root/.local /home/mcpuser/.local
 # Copy application code
 COPY --chown=mcpuser:mcpuser . .
 
+# Copy all markdown files to documents directory
+COPY --chown=mcpuser:mcpuser *.md /home/mcpuser/documents/
+
 # Switch to non-root user
 USER mcpuser
 
