@@ -6,7 +6,7 @@
 - **Protocol version:** `2025-11-25`
 - **Embedding:** Ollama `nomic-embed-text` (vector size 768)
 - **Vector DB:** Qdrant (collection `documentation`)
-- **Container:** `rag-mcp-streamable-http`, expose port `8000` (ในการทดสอบนี้ map host port `9002` ชั่วคราว เพราะ host port มาตรฐานถูกใช้งานใน sandbox ขณะทดสอบ)
+- **Container:** `rag-mcp-streamable-http`, map **`8000:8000`** (ตรงกับ rag-mcp-server-v3) — รันจริงผ่าน `docker compose up -d --build --force-recreate` และทดสอบที่ `http://localhost:8000/mcp`
 
 ## Result: 9/9 checks passed
 
