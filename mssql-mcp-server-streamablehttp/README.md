@@ -1,92 +1,99 @@
 # MSSQL MCP Server with Streamable HTTP Transport
 
-A Model Context Protocol (MCP) server that provides SQL Server database access through Streamable HTTP transport, containerized with Docker.
+MCP server สำหรับเข้าถึงฐานข้อมูล Microsoft SQL Server ผ่าน **Streamable HTTP transport** (มาตรฐาน MCP ปัจจุบัน ใช้ endpoint เดียว แทน HTTP+SSE แบบเก่า) รันเป็น container ด้วย Docker
 
 ## Features
 
-- **Streamable HTTP Transport**: Single-endpoint HTTP transport (the current MCP standard, replacing HTTP+SSE)
-- **MSSQL Integration**: Connect to Microsoft SQL Server databases
-- **FastAPI Backend**: Modern, fast web framework
-- **Docker Support**: Fully containerized application
-- **MCP Tools**: 
-  - Execute SQL queries
-  - Preview tables
-  - Get database information
-  - Refresh schema cache
-- **MCP Resources**:
-  - List all tables
-  - Get table schemas
-- **MCP Prompts**:
-  - Data analysis templates
-  - SQL query generation
+- **Streamable HTTP Transport** — ใช้ endpoint เดียว (`/mcp`) รับ POST/GET/DELETE ตามมาตรฐาน MCP ปัจจุบัน
+- **Stateless** — ไม่บังคับ `Mcp-Session-Id` (คล้าย FastMCP `stateless_http=True`) ต่อ client ได้หลากหลาย
+- **MSSQL Integration** — เชื่อมต่อฐานข้อมูล Microsoft SQL Server
+- **FastAPI + Uvicorn backend** — web framework ที่เร็วและทันสมัย
+- **Docker Support** — รันเป็น container ได้ทั้งหมด
+
+### MCP Tools (5)
+
+| Tool | หน้าที่ |
+|------|--------|
+| `get_database_context` | ดึง context ของฐานข้อมูลทั้งหมด (schema, ความสัมพันธ์, คู่มือ T-SQL) — **ควรเรียกตัวนี้ก่อนรัน query** |
+| `execute_query_tool` | รันคำสั่ง T-SQL query บนฐานข้อมูล |
+| `preview_table` | ดูตัวอย่างข้อมูลในตาราง (กำหนดจำนวนแถวได้) |
+| `get_database_info_tool` | ข้อมูลทั่วไปของฐานข้อมูล (ชื่อ, จำนวนตาราง, ขนาด, version) |
+| `refresh_db_cache` | รีเฟรช cache ของ schema ฐานข้อมูล |
+
+### MCP Resources (2)
+
+| URI | หน้าที่ |
+|-----|--------|
+| `mssql://tables` | ลิสต์ตารางทั้งหมดในฐานข้อมูล |
+| `mssql://schema/{table_name}` | ดึง schema ของตารางที่ระบุ |
 
 ## Installation
 
-> **Prerequisites:** Install and start **Docker Desktop** first ([Mac](https://docs.docker.com/desktop/install/mac-install/) / [Windows](https://docs.docker.com/desktop/install/windows-install/)). Make sure your SQL Server is running on the host machine and listening on port **1433**, and that local port **9000** is free.
+> **Prerequisites:** ติดตั้งและเปิด **Docker Desktop** ก่อน ([Mac](https://docs.docker.com/desktop/install/mac-install/) / [Windows](https://docs.docker.com/desktop/install/windows-install/)) ตรวจให้แน่ใจว่า SQL Server รันอยู่บนเครื่อง host ที่ port **1433** และ port **9000** บนเครื่องว่าง
 
-The steps differ slightly between Windows and Mac. Follow the section for your OS.
+ขั้นตอน Windows กับ Mac ต่างกันเล็กน้อย ทำตามหัวข้อของ OS ตัวเอง
 
 ---
 
 ### Windows (double-click)
 
-**1. Download the project from GitHub**
+**1. ดาวน์โหลดโปรเจกต์จาก GitHub**
 
-Open `Command Prompt` (CMD) and run:
+เปิด `Command Prompt` (CMD) แล้วรัน:
 
 ```cmd
 git clone https://github.com/aekanun2020/2026-2025-Best-MCP.git
 cd 2026-2025-Best-MCP\mssql-mcp-server-streamablehttp
 ```
 
-(No Git? Click the green **Code ▾** button on the [repo page](https://github.com/aekanun2020/2026-2025-Best-MCP) → **Download ZIP** → unzip → open the `mssql-mcp-server-streamablehttp` folder.)
+(ไม่มี Git? กดปุ่มสีเขียว **Code ▾** ที่ [หน้า repo](https://github.com/aekanun2020/2026-2025-Best-MCP) → **Download ZIP** → แตกไฟล์ → เปิดโฟลเดอร์ `mssql-mcp-server-streamablehttp`)
 
-**2. Start the server**
+**2. เริ่มรัน server**
 
-Open the `mssql-mcp-server-streamablehttp` folder in File Explorer and **double-click `start_docker.bat`**.
+เปิดโฟลเดอร์ `mssql-mcp-server-streamablehttp` ใน File Explorer แล้ว **double-click ไฟล์ `start_docker.bat`**
 
-A CMD window opens and does everything for you:
-- creates `.env` from `.env.example` (if it doesn't exist yet)
-- builds the Docker image
-- starts the container and streams its logs
+หน้าต่าง CMD จะเปิดขึ้นมาและทำให้ทั้งหมดให้อัตโนมัติ:
+- สร้าง `.env` จาก `.env.example` (ถ้ายังไม่มี)
+- build Docker image
+- รัน container และแสดง log สด
 
-**3. Done**
+**3. เสร็จ**
 
-The server is running at **http://localhost:9000/mcp** once you see the health logs.
-Keep the CMD window open — **closing it stops the server.** To stop, close the window or press `Ctrl + C`.
+เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:9000/mcp**
+เปิดหน้าต่าง CMD ค้างไว้ — **ปิดหน้าต่าง = server หยุด** ถ้าจะหยุดให้ปิดหน้าต่างหรือกด `Ctrl + C`
 
 ---
 
 ### Mac (Terminal)
 
-**1. Download the project from GitHub**
+**1. ดาวน์โหลดโปรเจกต์จาก GitHub**
 
-Open `Terminal` and run:
+เปิด `Terminal` แล้วรัน:
 
 ```bash
 git clone https://github.com/aekanun2020/2026-2025-Best-MCP.git
 cd 2026-2025-Best-MCP/mssql-mcp-server-streamablehttp
 ```
 
-**2. Start the server**
+**2. เริ่มรัน server**
 
 ```bash
-chmod +x start_docker.sh   # only needed the first time
+chmod +x start_docker.sh   # ทำแค่ครั้งแรกครั้งเดียว
 ./start_docker.sh
 ```
 
-The script creates `.env` from `.env.example` (if missing), builds the image, starts the container, and streams its logs.
+script จะสร้าง `.env` จาก `.env.example` (ถ้ายังไม่มี), build image, รัน container และแสดง log สด
 
-**3. Done**
+**3. เสร็จ**
 
-The server is running at **http://localhost:9000/mcp** once you see the health logs.
-Keep the Terminal open — closing it (or pressing `Ctrl + C`) stops the server.
+เมื่อเห็น log ขึ้น health แล้ว server จะรันที่ **http://localhost:9000/mcp**
+เปิด Terminal ค้างไว้ — ปิดหน้าต่าง (หรือกด `Ctrl + C`) = server หยุด
 
 ---
 
 ### Database configuration
 
-The installer copies [`.env.example`](.env.example) to `.env` for you, pre-set for a SQL Server running on the **same machine** as Docker Desktop:
+ตัวติดตั้งจะ copy [`.env.example`](.env.example) ไปเป็น `.env` ให้อัตโนมัติ โดยตั้งค่าไว้สำหรับ SQL Server ที่รันบน**เครื่องเดียวกัน**กับ Docker Desktop:
 
 ```env
 DB_SERVER=host.docker.internal
@@ -95,62 +102,61 @@ DB_USER=SA
 DB_PASSWORD=Passw0rd123456
 ```
 
-`host.docker.internal` lets the container reach SQL Server on your host machine. If your database lives elsewhere, edit `.env` (then re-run the start script) and change `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` accordingly.
+`host.docker.internal` ช่วยให้ container เข้าถึง SQL Server บนเครื่อง host ได้ ถ้าฐานข้อมูลอยู่ที่อื่น ให้แก้ `.env` (แล้วรัน start script ใหม่) เปลี่ยน `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` ให้ตรง
 
 ## Managing the container
 
-The container name is **`mssql-mcp-streamable-http`**. Run these from the `mssql-mcp-server-streamablehttp` folder.
+ชื่อ container คือ **`mssql-mcp-streamable-http`** — รันคำสั่งเหล่านี้จากในโฟลเดอร์ `mssql-mcp-server-streamablehttp`
 
 ```bash
-# Check status / health
+# เช็คสถานะ / health
 docker ps
 
-# View live logs
+# ดู log สด
 docker logs -f mssql-mcp-streamable-http
 
-# Stop the server (keeps the container so you can start it again)
+# หยุด server (เก็บ container ไว้ start ใหม่ได้)
 docker compose stop
 
-# Start it again later
+# เปิดใช้งานใหม่ภายหลัง
 docker compose start
 ```
 
 ## Re-running with a new configuration
 
-If you change `.env` (for example a different `DB_SERVER` or password), apply the new
-configuration by **rebuilding and recreating** the container in place:
+ถ้าแก้ `.env` (เช่น เปลี่ยน `DB_SERVER` หรือ password) ให้ apply config ใหม่ด้วยการ **rebuild + recreate** container ในที่เดิม:
 
 ```bash
 docker compose up -d --build --force-recreate
 ```
 
-> **Do NOT run `docker compose down`.** `down` removes the container together with its
-> network (and can drop other associated resources), which is unnecessary and can
-> interrupt anything else relying on it. `up -d --build --force-recreate` already
-> recreates the container in place with your new `.env`/config — this is the only command
-> you need to re-apply changes.
+> **ห้ามรัน `docker compose down`** — `down` จะลบ container พร้อม network (และอาจกระทบ resource อื่น) ซึ่งไม่จำเป็น
+> คำสั่ง `up -d --build --force-recreate` จะ recreate container ในที่พร้อม `.env`/config ใหม่ให้อยู่แล้ว — ใช้แค่คำสั่งนี้คำสั่งเดียว
 
 ## API Endpoints
 
-- `POST /mcp` - MCP message endpoint (Streamable HTTP, **stateless**)
-- `GET /mcp` - SSE stream endpoint (returns 405 if the server does not offer a stream)
-- `DELETE /mcp` - Terminate an MCP session (no-op when stateless; always returns 200)
-- `GET /health` - Health check endpoint
-- `GET /` - API documentation
+`/mcp` เป็น endpoint เดียวของ Streamable HTTP รองรับ 3 method:
+
+| Method / Path | หน้าที่ |
+|---------------|--------|
+| `POST /mcp` | รับ JSON-RPC message ของ MCP (ตัวหลักที่ใช้สื่อสาร) |
+| `GET /mcp` | เปิด SSE stream — server นี้ไม่มี server-initiated stream จึงคืน **405** ตาม spec |
+| `DELETE /mcp` | ปิด session — โหมด stateless เป็น no-op คืน **200** เสมอ |
+| `GET /health` | Health check (ใช้โดย Docker healthcheck) |
+| `GET /` | ข้อมูล service และรายการ endpoint |
 
 ### Session handling (stateless)
 
-This server runs in **stateless** mode (similar to FastMCP's `stateless_http=True`).
-An `Mcp-Session-Id` is minted and returned on `initialize` for compatibility,
-but subsequent requests are accepted **with or without** the `Mcp-Session-Id` header.
-This lets clients that do not echo back the session id (e.g. PyClaw's Streamable HTTP path) work without modification.
+Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateless_http=True`):
+ตอน `initialize` จะ mint `Mcp-Session-Id` ส่งกลับมาใน response header ไว้ให้ client ที่ต้องการใช้ (optional)
+แต่ request ถัดไปจะถูกยอมรับ **ทั้งที่มีและไม่มี** header นี้
+ทำให้ client ที่ไม่ได้ส่ง session id กลับมา (เช่น Streamable HTTP path ของ PyClaw) ต่อได้โดยไม่ต้องแก้อะไร
 
-**Note:** When using Docker, the server runs internally on port 8000 but is exposed externally on port 9000.
+> **Note:** บน Docker server รันภายในที่ port **8000** แต่ expose ออกมาภายนอกที่ port **9000**
 
 ## MCP Client Configuration
 
-For Claude Desktop or other MCP clients, connect through `mcp-remote` (it bridges a
-Streamable HTTP server into the stdio interface these clients expect):
+สำหรับ Claude Desktop หรือ MCP client อื่นๆ ให้ต่อผ่าน `mcp-remote` (มันทำหน้าที่ bridge จาก Streamable HTTP server ไปเป็น stdio ที่ client เหล่านี้ต้องการ):
 
 ```json
 {
@@ -168,9 +174,7 @@ Streamable HTTP server into the stdio interface these clients expect):
 }
 ```
 
-Replace `localhost` with the server's IP (e.g. a LAN or Tailscale address) if the client
-runs on a different machine than the server. `--allow-http` is required because the
-server is served over plain HTTP, not HTTPS.
+ถ้า client อยู่คนละเครื่องกับ server ให้เปลี่ยน `localhost` เป็น IP ของ server (เช่น LAN หรือ Tailscale address) ส่วน `--allow-http` จำเป็นเพราะ server เสิร์ฟผ่าน HTTP ธรรมดา ไม่ใช่ HTTPS
 
 ## License
 
