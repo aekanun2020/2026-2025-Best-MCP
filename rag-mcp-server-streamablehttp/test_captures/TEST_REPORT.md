@@ -34,11 +34,25 @@
 - `tools/list` และ `tools/call` ทุกตัวยิงโดย **ไม่ส่ง `Mcp-Session-Id`** และ server ยังตอบ JSON ปกติ (log แสดง `session=None`)
 - ตรงกับ Streamable HTTP path ของ PyClaw ที่ไม่ส่ง session id กลับ → ต่อได้ทันทีโดยไม่ต้องแก้
 
+## Real-document test (เอกสาร .md จริงจาก repo)
+
+นำไฟล์ `.md` ทั้ง **17 ไฟล์** จาก `rag-mcp-server-v3/` (ทั้งคู่มือ + เอกสาร domain เช่น `customerservice-policy.md`, `dti-calculation-guide.md`, `loan-analysis-summary.md`, `job_announcement.md`, `รายการเอกสารส่ง-Client.md`) ไป ingest แล้วค้นจริง:
+
+| ขั้น | ผล |
+|------|-----|
+| `add_directory /home/mcpuser/v3docs` | ingest **17 ไฟล์ สำเร็จทั้งหมด, 0 fail** — สร้าง **117 chunks** เข้า Qdrant |
+| `list_sources` | แสดง source ครบทั้ง 17 ไฟล์ |
+| `search_documentation` (Thai) | "DTI การคำนวณ..." → `dti.md` (score 0.80); "นโยบายบริการลูกค้า" / "customer service policy" → `customerservice-policy.md` (PDPA) |
+| `search_documentation` (Eng) | "Ollama setup nomic-embed-text" → `OLLAMA_SETUP.md` (score 0.71); "loan analysis summary" → `loan-analysis-summary.md` |
+
+ยืนยันว่า Hybrid Search ดึงเนื้อหาจริงได้ทั้ง **ภาษาไทยและอังกฤษ** หมายเหตุ: query กว้างๆ บางครั้ง favor `loan-analysis-summary.md` (ไฟล์ใหญ่สุด 48KB → chunk เยอะ) แต่ query ที่เจาะจงคืนเอกสารที่ตรงประเด็นได้ถูกต้อง
+
 ## Captures
 
 - `01_all_tools_e2e.png` — ผลรัน `test_all_tools.py` (9/9 PASS)
 - `02_protocol_raw.png` — raw `initialize` + `tools/list` (4 tools) + GET 405
 - `03_docker_run.png` — docker ps + log จริงตอน ingest เข้า Qdrant ผ่าน Ollama, session=None, GET 405, DELETE 204
+- `04_v3docs_ingest_search.png` — ingest เอกสาร .md จริง 17 ไฟล์ (117 chunks) + Hybrid Search คืนผลภาษาไทย/อังกฤษ
 
 ## How to reproduce
 
