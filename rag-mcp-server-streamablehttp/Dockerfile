@@ -19,9 +19,11 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Final stage
 FROM python:3.11-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including telnet, wget, curl
 RUN apt-get update && apt-get install -y \
     libgomp1 \
+    telnet \
+    wget \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
