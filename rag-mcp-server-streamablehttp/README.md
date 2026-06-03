@@ -17,7 +17,7 @@ MCP server สำหรับค้นหาเอกสาร (RAG) แบบ *
 
 | Tool | หน้าที่ |
 |------|--------|
-| `search_documentation` | ค้นหาเอกสารที่เก็บไว้ (รับ `query`, `limit` default 5) — ใช้ Hybrid Search เป็นค่าเริ่มต้น |
+| `search_documentation` | ค้นหาเอกสารที่เก็บไว้ (รับ `query`, `limit` default 5, `search_mode` default `hybrid`) — เลือกได้ `semantic` / `bm25` / `hybrid` |
 | `list_sources` | ลิสต์ source ของเอกสารทั้งหมดที่เก็บอยู่ |
 | `add_directory` | เพิ่มไฟล์เอกสารทั้งโฟลเดอร์เข้าระบบ (รับ `path`) |
 | `add_context` | เพิ่ม text content ตรงๆ เข้า RAG store เช่น context จาก agent (รับ `content`, `title`, `source`, `metadata`) |
@@ -177,6 +177,88 @@ Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateles
 ```
 
 ถ้า client อยู่คนละเครื่องกับ server ให้เปลี่ยน `localhost` เป็น IP ของ server (เช่น LAN หรือ Tailscale address) ส่วน `--allow-http` จำเป็นเพราะ server เสิร์ฟผ่าน HTTP ธรรมดา ไม่ใช่ HTTPS
+
+## วิธีใช้งาน (Usage)
+
+หลัง server รันแล้ว ใช้งานได้ 2 ทาง: ผ่าน **MCP client** (เช่น Claude Desktop, PyClaw) หรือ **เรียกตรงด้วย curl** เพื่อทดสอบ
+
+### ขั้นตอนใช้งานพื้นฐาน
+
+1. **ใส่เอกสารเข้าระบบก่อน** — ใช้ `add_directory` (ทั้งโฟลเดอร์) หรือ `add_context` (text ตรงๆ) เอกสารจะถูกแปลงเป็น vector เก็บใน Qdrant และ index ลง BM25 ไปพร้อมกัน
+2. **ค้นหาด้วย `search_documentation`** — ใส่ `query` แล้วระบบจะค้นแบบ **Hybrid** (BM25 + Semantic + RRF) ให้อัตโนมัติ
+3. ถ้าต้องการบังคับโหมด ให้ใส่ `search_mode` เป็น `semantic`, `bm25` หรือ `hybrid`
+
+> **ผ่าน MCP client:** แค่พิมพ์สั่ง AI ว่า "ค้นหาเอกสารเรื่อง..." client จะเรียก `search_documentation` ให้เอง — ได้ Hybrid โดยอัตโนมัติ ไม่ต้องตั้งค่าอะไรเพิ่ม
+
+### ค้นหา (default = Hybrid)
+
+```bash
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": {
+      "name": "search_documentation",
+      "arguments": { "query": "Hybrid Search ภาษาไทย", "limit": 5 }
+    }
+  }'
+```
+
+### เลือกโหมดค้นหา (semantic / bm25 / hybrid)
+
+เพิ่ม `search_mode` ใน `arguments`:
+
+```bash
+# BM25 อย่างเดียว (keyword/exact match — เหมาะกับเลขข้อ เลขไทย ๒๑)
+# เปลี่ยนเป็น "semantic" สำหรับ vector search ล้วน หรือ "hybrid" สำหรับรวมทั้งสอง (ค่าเริ่มต้น)
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": {
+      "name": "search_documentation",
+      "arguments": { "query": "ข้อ ๘๖", "limit": 3, "search_mode": "bm25" }
+    }
+  }'
+```
+
+| `search_mode` | ค้นแบบ | score ที่ได้ |
+|---------------|--------|-------------|
+| `hybrid` (default) | BM25 + Semantic รวมด้วย RRF | RRF score (เลขน้อย เช่น 0.0x — ปกติของ RRF) |
+| `semantic` | Dense vector อย่างเดียว | cosine similarity (0–1) |
+| `bm25` | Sparse keyword อย่างเดียว | BM25 score (keyword match) |
+
+### เพิ่มเอกสาร
+
+```bash
+# add_directory — ทั้งโฟลเดอร์ (path ต้องเป็น path ภายใน container เช่น /home/mcpuser/documents)
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_directory","arguments":{"path":"/home/mcpuser/documents"}}}'
+
+# add_context — ใส่ text ตรงๆ
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_context","arguments":{"content":"เนื้อหา...","title":"หัวข้อ","source":"agent"}}}'
+```
+
+### ดู log ยืนยันว่า Hybrid ทำงานจริง
+
+```bash
+docker logs -f rag-mcp-streamable-http
+```
+
+ตอน startup จะเห็น BM25 index ถูกสร้าง และตอนค้นหาจะเห็นทั้ง BM25 และ Semantic ทำงาน:
+
+```
+SearchOrchestrator initialized with default_mode=hybrid
+✅ BM25 index built successfully with N documents
+Search request: query='...', mode=hybrid
+BM25 search returned X results (max_score=...)
+Hybrid search returned Y results (BM25: X, Semantic: X)
+```
 
 ## License
 
