@@ -2,7 +2,7 @@
 
 MCP server สำหรับค้นหาเอกสาร (RAG) แบบ **Hybrid Search** (BM25 + Semantic + RRF) รองรับภาษาไทย ผ่าน **Streamable HTTP transport** (มาตรฐาน MCP ปัจจุบัน ใช้ endpoint เดียว แทน HTTP+SSE แบบเก่า) รันเป็น container ด้วย Docker
 
-ใช้ **Qdrant** เป็น vector database และ **Ollama** (หรือ OpenAI) สำหรับสร้าง embedding — ทั้งสองตัวรันแยกอยู่นอก container ตัวนี้
+ใช้ **Qdrant** เป็น vector database และ **Ollama** (หรือ OpenAI) สำหรับสร้าง embedding — ทั้งสองตัวรวมอยู่ใน `docker-compose.yml` แล้ว — รันครั้งเดียวขึ้นมาครบทุกตัว ไม่ต้องติดตั้งแยกเอง
 
 ## Features
 
@@ -26,8 +26,9 @@ MCP server สำหรับค้นหาเอกสาร (RAG) แบบ *
 
 > **Prerequisites:**
 > 1. ติดตั้งและเปิด **Docker Desktop** ก่อน ([Mac](https://docs.docker.com/desktop/install/mac-install/) / [Windows](https://docs.docker.com/desktop/install/windows-install/))
-> 2. มี **Qdrant** รันอยู่ที่ port **6333** และ **Ollama** รันอยู่ที่ port **11434** บนเครื่อง host (รันแยกไว้ก่อน) และ pull embedding model ไว้: `ollama pull nomic-embed-text`
-> 3. port **8000** บนเครื่องว่าง
+> 2. port **8000** (MCP server), **6333** (Qdrant) และ **11434** (Ollama) บนเครื่องว่าง
+>
+> **ไม่ต้องติดตั้ง Qdrant/Ollama เอง** — `docker-compose.yml` รันให้ครบทั้ง Qdrant + Ollama + MCP server และ pull `nomic-embed-text` ให้อัตโนมัติตอนรันครั้งแรก
 
 ขั้นตอน Windows กับ Mac ต่างกันเล็กน้อย ทำตามหัวข้อของ OS ตัวเอง
 
@@ -91,17 +92,17 @@ script จะสร้าง `.env` จาก `.env.example` (ถ้ายัง
 
 ### Configuration
 
-ตัวติดตั้งจะ copy [`.env.example`](.env.example) ไปเป็น `.env` ให้อัตโนมัติ โดยตั้งค่าไว้สำหรับ Qdrant + Ollama ที่รันบน**เครื่องเดียวกัน**กับ Docker Desktop:
+ตัวติดตั้งจะ copy [`.env.example`](.env.example) ไปเป็น `.env` ให้อัตโนมัติ โดยชี้ไปที่ service `qdrant` และ `ollama` ภายใน `docker-compose.yml` เดียวกัน:
 
 ```env
-QDRANT_URL=http://host.docker.internal:6333
+QDRANT_URL=http://qdrant:6333
 EMBEDDING_PROVIDER=ollama
 EMBEDDING_MODEL=nomic-embed-text
-OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_URL=http://ollama:11434
 OPENAI_API_KEY=
 ```
 
-`host.docker.internal` ช่วยให้ container เข้าถึง Qdrant/Ollama บนเครื่อง host ได้ ถ้า Qdrant/Ollama อยู่ที่อื่น ให้แก้ `.env` (แล้วรัน start script ใหม่) เปลี่ยน `QDRANT_URL` / `OLLAMA_URL` ให้ตรง
+`qdrant` / `ollama` คือชื่อ service ใน compose — container คุยกันผ่าน network ภายในได้เลย ไม่ต้องตั้ง Qdrant/Ollama แยกเอง
 
 ถ้าจะใช้ OpenAI แทน Ollama ให้ตั้ง `EMBEDDING_PROVIDER=openai` และใส่ `OPENAI_API_KEY`
 
@@ -153,7 +154,7 @@ Server ทำงานแบบ **stateless** (คล้าย FastMCP `stateles
 แต่ request ถัดไป (`tools/list`, `tools/call`) จะคืน JSON response ตรงๆ **โดยไม่บังคับ** header นี้
 ทำให้ client ที่ไม่ได้ส่ง session id กลับมา (เช่น Streamable HTTP path ของ PyClaw) ต่อได้โดยไม่ต้องแก้อะไร
 
-> **Note:** บน Docker server รันที่ port **8000** ทั้งภายใน container และ expose ออกมาภายนอก (ตรงกับ rag-mcp-server-v3)
+> **Note:** server รันที่ port **8000** ทั้งภายใน container และ expose ออกมาภายนอก (ตรงกับ rag-mcp-server-v3) — Qdrant อยู่ที่ 6333, Ollama อยู่ที่ 11434 (รันจาก compose เดียวกัน)
 
 ## MCP Client Configuration
 

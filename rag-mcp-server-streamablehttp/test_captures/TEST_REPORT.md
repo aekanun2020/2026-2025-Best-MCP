@@ -1,12 +1,12 @@
 # RAG MCP Server (Streamable HTTP) — Test Report
 
-ทดสอบ end-to-end จริงบน Docker โดยรัน **Qdrant + Ollama** เป็น service ภายนอก แล้วให้ container ของ RAG MCP server ต่อเข้าไปผ่าน `host.docker.internal`
+ทดสอบ end-to-end จริงบน Docker — `docker-compose.yml` รันให้ครบทั้ง **Qdrant + Ollama + RAG MCP server** ในคำสั่งเดียว (ตรงกับ rag-mcp-server-v3) — ไม่ต้องติดตั้ง Qdrant/Ollama แยกเอง RAG server ต่อ Qdrant ผ่าน service name ภายใน (`http://qdrant:6333`)
 
 - **Transport:** Streamable HTTP (single endpoint `/mcp`), **stateless**
 - **Protocol version:** `2025-11-25`
 - **Embedding:** Ollama `nomic-embed-text` (vector size 768)
 - **Vector DB:** Qdrant (collection `documentation`)
-- **Container:** `rag-mcp-streamable-http`, map **`8000:8000`** (ตรงกับ rag-mcp-server-v3) — รันจริงผ่าน `docker compose up -d --build --force-recreate` และทดสอบที่ `http://localhost:8000/mcp`
+- **Containers (จาก compose เดียว):** `pyrag-qdrant-streamable` (6333), `pyrag-ollama-streamable` (11434, pull `nomic-embed-text` อัตโนมัติ), `rag-mcp-streamable-http` (**`8000:8000`**) — รันด้วย `docker compose up -d --build` คำสั่งเดียว ทดสอบที่ `http://localhost:8000/mcp`
 
 ## Result: 9/9 checks passed
 
@@ -57,14 +57,11 @@
 ## How to reproduce
 
 ```bash
-# 1) external services
-docker run -d --name pyrag-qdrant -p 6333:6333 qdrant/qdrant:latest
-docker run -d --name pyrag-ollama -p 11434:11434 ollama/ollama:latest
-docker exec pyrag-ollama ollama pull nomic-embed-text
-
-# 2) build + run this server (uses .env.example -> .env)
+# 1) ขึ้นครบทั้ง Qdrant + Ollama + RAG server ในคำสั่งเดียว
+#    (ตัว start script จะ copy .env.example -> .env และ build + up ให้)
 ./start_docker.sh        # Mac    (Windows: double-click start_docker.bat)
+# Ollama จะ pull nomic-embed-text ให้อัตโนมัติตอนรันครั้งแรก (~1 นาที)
 
-# 3) run the test suite
+# 2) run the test suite
 python test_all_tools.py http://localhost:8000/mcp
 ```

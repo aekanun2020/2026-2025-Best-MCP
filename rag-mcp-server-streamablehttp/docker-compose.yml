@@ -1,35 +1,62 @@
 services:
+  # Ollama service for embeddings
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pyrag-ollama-streamable
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - pyrag-network
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+
+  # Qdrant vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: pyrag-qdrant-streamable
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - pyrag-network
+    restart: unless-stopped
+
+  # PyRAGDoc Streamable HTTP server (stateless)
   mcp-server:
     build: .
     container_name: rag-mcp-streamable-http
     ports:
       - "8000:8000"
     environment:
-      # External Qdrant + Ollama (ต้องรันแยกไว้ก่อน / must be running externally)
-      - QDRANT_URL=${QDRANT_URL:-http://host.docker.internal:6333}
+      - QDRANT_URL=http://qdrant:6333
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-ollama}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
-      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_URL=http://ollama:11434
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - HOST=0.0.0.0
       - PORT=8000
       - ENVIRONMENT=production
     env_file:
       - .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ./logs:/app/logs
-    restart: unless-stopped
+    depends_on:
+      - qdrant
+      - ollama
     networks:
-      - mcp-network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - pyrag-network
+    restart: unless-stopped
 
 networks:
-  mcp-network:
+  pyrag-network:
     driver: bridge
+
+volumes:
+  qdrant_data:
+  ollama_data:
