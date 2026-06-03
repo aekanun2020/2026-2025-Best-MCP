@@ -135,6 +135,50 @@ docker compose up -d --build --force-recreate
 > **ห้ามรัน `docker compose down`** — `down` จะลบ container พร้อม network (และอาจกระทบ resource อื่น) ซึ่งไม่จำเป็น
 > คำสั่ง `up -d --build --force-recreate` จะ recreate container ในที่พร้อม `.env`/config ใหม่ให้อยู่แล้ว — ใช้แค่คำสั่งนี้คำสั่งเดียว
 
+## ดูและล้างข้อมูลใน Qdrant
+
+ข้อมูลเอกสาร (vector) เก็บอยู่ใน collection ชื่อ **`documentation`** บน Qdrant (port 6333) — สั่งคำสั่งได้ตรงด้วย curl
+
+### ดูจำนวนข้อมูล
+
+```bash
+# จำนวน points และโครงสร้าง collection
+curl -s http://localhost:6333/collections/documentation | python3 -m json.tool
+# ดู points_count — ถ้ามากกว่า 0 คือมีข้อมูลเก็บอยู่
+
+# ดูรายการ collection ทั้งหมด
+curl -s http://localhost:6333/collections | python3 -m json.tool
+```
+
+### ล้างข้อมูล — วิธีที่แนะนำ (ไม่ทำลายโครงสร้าง)
+
+ลบเฉพาะ **points** ข้างใน — collection (vector size 768, Cosine, HNSW config) **ยังอยู่ครบ** ไม่ต้อง recreate container:
+
+```bash
+curl -X POST "http://localhost:6333/collections/documentation/points/delete?wait=true" \
+  -H "Content-Type: application/json" \
+  -d '{"filter": {}}'
+```
+
+✅ หลังลบ server ใช้งานต่อได้ทันที (add/search) — ไม่ต้องรีสตาร์ตอะไร นี่คือวิธีที่แนะนำสำหรับ reset ข้อมูล
+
+> **หมายเหตุ (BM25 index):** Qdrant (vector) จะว่างทันที แต่ BM25 index ในหน่วยความจำของ server จะยังจำของเก่าจนกว่าจะ `add` ข้อมูลชุดใหม่ หรือ restart container — ถ้าอยากล้าง BM25 ให้หมดจริงๆ ให้ `docker compose restart mcp-server` หลังลบ points
+
+### ลบทั้ง collection — รีเซ็ตสุด (ต้อง recreate container)
+
+ถ้าอยากล้างแบบหมดจดรวมโครงสร้าง collection:
+
+```bash
+# 1. ลบทั้ง collection
+curl -X DELETE http://localhost:6333/collections/documentation
+
+# 2. ต้อง recreate container เพราะ server สร้าง collection แค่ตอน startup
+docker compose up -d --force-recreate mcp-server
+```
+
+> **ระวัง:** ถ้า `DELETE` ทั้ง collection แล้ว**ไม่** recreate container — การเรียก add/search ครั้งถัดไปจะได้ error `404 Collection doesn't exist` เพราะ server สร้าง collection เฉพาะตอน startup เท่านั้น
+> ถ้าแค่ reset ข้อมูลธรรมดา — ใช้วิธี“ล้าง points”ด้านบนจะสะดวกกว่า (ไม่ต้อง recreate)
+
 ## API Endpoints
 
 `/mcp` เป็น endpoint เดียวของ Streamable HTTP รองรับ 3 method:
